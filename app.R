@@ -34,6 +34,7 @@ library(shinycssloaders)
 readRenviron(".Renviron")
 source("global.R")
 source("utils.R")
+source("sharepoint_functions.R")
 source("Modules/mQueriesReport.R")
 source("Modules/mDMReport.R")
 source("Modules/mDataAging.R")
@@ -55,24 +56,11 @@ source("Modules/Admin/mAudit.R")
 # Define UI for application
 ui <- dashboardPage(
   dashboardHeader(title = "Reporting Portal"),
-  dashboardSidebar(
-    sidebarMenu(sidebarMenuOutput("sidebarMenu")
-      # menuItem("Queries Report", tabName = "queries_report", icon = icon("list")),
-      # menuItem("DM Report", tabName = "dm_report", icon = icon("list")),
-      # menuItem("Data Aging", tabName = "data_aging", icon = icon("clock"))
-    )
+  dashboardSidebar(sidebarMenu(sidebarMenuOutput("sidebarMenu"))
   ),
   dashboardBody(
     authUI("authtab"),
     tags$head(tags$style(HTML('.content-wrapper { overflow: auto; }'))) #Stops a visual glitch with the tab backgrounds
-    # tabItems(
-    #   # Queries Report Section
-    #   tabItem(tabName = "queries_report", queriesReportUI("queries_report")),
-    #   # DM Report Section
-    #   tabItem(tabName = "dm_report", DMReportUI("dm_report")),
-    #   # Data Aging Section
-    #   tabItem(tabName = "data_aging", dataAgingUI("data_aging"))
-    #)
   )
 )
 
@@ -80,14 +68,14 @@ ui <- secure_app(
   ui = ui,
   enable_admin = TRUE,
   language = "en",
-  tags_top = tags$div(tags$h2("Test Auth"), tags$a(onclick="forgotpass()", "Forgot Password"),tags$div(id="forgotpassdiv")),
+  tags_top = tags$div(tags$h2(APP_TITLE), tags$a(onclick="forgotpass()", "Forgot Password"),tags$div(id="forgotpassdiv")),
   head_auth = tags$head(tags$script(src = "head_enter.js"))
 )
 
 
 # Define server logic
 server <- function(input, output, session) {
-  
+  options(shiny.maxRequestSize=30*1024^2)
   #=== MFA ===
   credentials_data <- reactiveValues(USERS = read_users_from_DB())
   user_roles <<- reactiveVal(read_roles())
@@ -192,8 +180,8 @@ server <- function(input, output, session) {
         username = session$userData$USERNAME,
         action = "successful_login"
       )
-      load_temp_scripts()
       connect_to_sharepoint()
+      load_temp_scripts()
       homeServer("home", auth_out$first_login)
       queriesReportServer("queries_report")
       DMReportServer("dm_report")
@@ -215,6 +203,7 @@ server <- function(input, output, session) {
   
   query_data <- NULL
   study_name <- reactiveVal(NULL)
+  STUDIES_LIST <<- NULL
   # # Reactive value for studies list
   # studies_list_dm <- reactiveVal()
 

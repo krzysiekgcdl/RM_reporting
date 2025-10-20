@@ -84,7 +84,7 @@ generate_dm_report <- function(session, input, output, all_data, progress = NULL
     i <- use_table[idx]
     
     print(paste("Generating table", i))
-    
+
     # Call the table function dynamically
     current_function <- get(paste0("tab", i, "_fun"))
     my_doc <- current_function(variables, all_data, my_doc, descriptions_variables[i, "TableDescription"])

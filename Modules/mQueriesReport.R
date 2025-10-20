@@ -11,7 +11,7 @@ queriesReportUI <- function(id) {
                        width = 4, height = "200px",
                        solidHeader = TRUE, status = "primary",
                        title = "Select the study name",
-                       selectInput(ns("study_name"), label = "Select or enter a study name:", choices = c("Study1", "Study2"), selected = "Study1")
+                       selectInput(ns("study_name"), label = "Select or enter a study name:", choices = c())
                      ),
                      box(
                        width = 4, height = "200px",
@@ -27,7 +27,8 @@ queriesReportUI <- function(id) {
                          title = "Report Download",
                          p(strong("Click the button below to download the report.")),
                          downloadButton(ns("downloadWord"), label = "Download")
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    ),
                    fluidRow(
@@ -38,7 +39,8 @@ queriesReportUI <- function(id) {
                          solidHeader = TRUE,
                          title = "Data Preview",
                          dataTableOutput(ns("read_data"))
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    )
           ),
@@ -97,18 +99,24 @@ queriesReportServer <- function(id) {
       outputOptions(output, "fileUploaded", suspendWhenHidden = FALSE)
       
       # Reactive value for studies list
-      studies_list <- reactiveVal()
+      studies_list <- reactiveVal(NULL)
       
       # Load studies list from CSV file
       observe({
-        studies <- read.csv("studies_queries.csv", header = TRUE, stringsAsFactors = FALSE)
-        studies_list(studies)
-        study_choices <- c(unique(studies_list()$Study_Name))
-        updateSelectInput(session, "study_name", choices = study_choices, selected = study_choices[1])
+        #studies <- read.csv("studies_queries.csv", header = TRUE, stringsAsFactors = FALSE)
+        if (is.null(studies_list())) {
+          studies <- load_studies_list("Queries")
+          studies_list(studies)
+        }
+        # studies <- load_studies_list("Queries")
+        # studies_list(studies)
+        # study_choices <- c(unique(studies_list()$Study_Name))
+        updateSelectInput(session, "study_name", choices = studies_list()$Study_Name, selected = studies_list()[1,c("Study_Name")])
       })
       
       # Render studies table
       output$studies_table <- renderDT({
+        req(studies_list())
         datatable(
           studies_list(), rownames = FALSE, selection = 'multiple', escape = FALSE,
           options = list(
@@ -131,8 +139,9 @@ queriesReportServer <- function(id) {
       observeEvent(input$remove_study, {
         req(input$studies_table_rows_selected)
         studies <- studies_list()
+        delete_from_database(STUDIES_DB_NAME, "Study", studies[input$studies_table_rows_selected, c("Study_Name")])
         studies <- studies[-input$studies_table_rows_selected, , drop = FALSE]
-        write.csv(studies, "studies_queries.csv", row.names = FALSE)
+        #write.csv(studies, "studies_queries.csv", row.names = FALSE)
         studies_list(studies)
       })
       
@@ -140,10 +149,13 @@ queriesReportServer <- function(id) {
       observeEvent(input$add_study, {
         new_study_name <- input$new_study
         if (nchar(new_study_name) > 0) {
-          new_study <- data.frame(Study_Name = new_study_name, stringsAsFactors = FALSE)
-          studies <- rbind(studies_list(), new_study)
-          write.csv(studies, "studies_queries.csv", row.names = FALSE)
-          studies_list(studies)
+          new_study <- data.frame(
+            Study = as.character(new_study_name),
+            Queries = 1
+          )
+          studies <- add_db_data_return(STUDIES_DB_NAME, new_study)
+          studies_list(studies$Studies)
+          updateTextInput(session, "new_study", value = "")
         }
       })
       

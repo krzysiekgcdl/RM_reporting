@@ -39,7 +39,8 @@ dataAgingUI <- function(id) {
                          title = "Report Download",
                          p(strong("Click the button below to download the report.")),
                          downloadButton(ns("download_auditlog"), label = "Download Report")
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    ),
                    fluidRow(
@@ -50,7 +51,8 @@ dataAgingUI <- function(id) {
                          solidHeader = TRUE,
                          title = "Data Preview",
                          dataTableOutput(ns("read_audit_log"))
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    )
           )
@@ -75,18 +77,19 @@ dataAgingServer <- function(id) {
       study_name_aging <- reactiveVal(NULL)      # Stores the selected study name
       variables_list_aging <- reactiveVal(NULL)  # List of variables loaded
       
-      # Reactive value for studies list
-      studies_list_da <- reactiveVal()
-      
-      # Load studies list from CSV file
-      observe({
-        studies <- read.csv("studies_dm.csv", header = TRUE, stringsAsFactors = FALSE)
-        studies_list_da(studies)
-      })
+      # # Reactive value for studies list
+      # studies_list_da <- reactiveVal()
+      # 
+      # # Load studies list from CSV file
+      # observe({
+      #   studies <- read.csv("studies_dm.csv", header = TRUE, stringsAsFactors = FALSE)
+      #   studies_list_da(studies)
+      # })
       
       # Update choices for study name selectInput
       observe({
-        study_choices <- c(unique(studies_list_dm()$Study_Name))
+        study_choices <- load_studies_list("DM")
+        #study_choices <- c(unique(studies_list_dm()$Study_Name))
         updateSelectInput(session, "study_name_aging", choices = study_choices, selected = study_choices[1])
       })
       
@@ -116,33 +119,13 @@ dataAgingServer <- function(id) {
         })
       })
       
-      # Function to Read Excel File from SharePoint for Data Aging Variables
-      read_sharepoint_file_DA <- function(template_name) {
-        temp_file <- tempfile(fileext = ".xlsx")
-        drv$download_file(paste0(STUDY_DA_PATH, template_name), dest = temp_file)
-        
-        # Read Report Description
-        report_description <- read_excel(temp_file, sheet = "RaportDescription")
-        sheets <- as.character(report_description$items_names)
-        
-        # Load all specified sheets into a list and clean each one
-        variables_data <- lapply(sheets, function(sheet) {
-          read_excel(temp_file, sheet = sheet) %>%
-            clean_dataframe()  # CLEANING APPLIED HERE
-        })
-        
-        # Assign sheet names to list elements
-        names(variables_data) <- sheets
-        return(variables_data)
-      }
-      
       # Load Variables Data from Template
       observeEvent(study_name_aging(), {
         req(study_name_aging())
         template_name <- paste0(study_name_aging(), ".xlsx")
         
         tryCatch({
-          variables_list_aging(read_sharepoint_file_DA(template_name))
+          variables_list_aging(read_sharepoint_file("DataAging_Templates", template_name))
           showNotification("Data Aging Variables data loaded successfully!", type = "message")
           #print(variables_list_aging())
         }, error = function(e) {

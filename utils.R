@@ -34,3 +34,11 @@ load_temp_scripts <- function() {
     source(temp_file)
   }
 }
+
+load_studies_list <- function(tab, refresh=FALSE) {
+  if (is.null(STUDIES_LIST) || refresh) {
+    STUDIES_LIST <<- read_from_DB(STUDIES_DB_NAME)
+  }
+  res <- data.frame(Study_Name = STUDIES_LIST[STUDIES_LIST[[tab]] == TRUE, c("Study")])
+  return(res)
+}

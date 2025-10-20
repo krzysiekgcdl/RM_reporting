@@ -1,4 +1,81 @@
 
+read_from_DB <- function(db_name){
+  # MAKE MYSQL CONNECTION
+  database_connect <- RMariaDB::dbConnect(
+    drv = RMariaDB::MariaDB(),
+    dbname = Sys.getenv("DB_NAME"),
+    host = Sys.getenv("DB_HOST"),
+    username = Sys.getenv("DB_USER"),
+    password = Sys.getenv("DB_PASS"),
+    port = as.integer(Sys.getenv("DB_PORT")),
+    mysql = TRUE
+  )
+  # CLOSE MYSQL CONNECTION AFTER CLOSE FUNC
+  on.exit( {
+    tryCatch({
+      dbDisconnect(database_connect)
+      #print("POOL CLOSE DB!", type = "message")
+    }, error = function(e) {
+      #showNotification(paste("Error when pool closing:", e$message), type = "error")
+      print(paste("Error when pool closing:", e$message))
+    })
+  })
+  
+  df <- NULL
+  tryCatch({
+    df <- dbReadTable(database_connect, db_name)
+  }, error = function(e) {
+    showNotification(paste("Error_DB:", e$message), type = "error")
+    print(paste("Error_DB:", e$message))
+  })
+  return(df)
+}
+
+
+#Deletes row based on row key (user)
+delete_from_database <- function(db_name, keyname, key = NULL){
+  
+  # MAKE MYSQL CONNECTION
+  database_connect <- RMariaDB::dbConnect(
+    drv = RMariaDB::MariaDB(),
+    dbname = Sys.getenv("DB_NAME"),
+    host = Sys.getenv("DB_HOST"),
+    username = Sys.getenv("DB_USER"),
+    password = Sys.getenv("DB_PASS"),
+    port = as.integer(Sys.getenv("DB_PORT"))
+    ,mysql = TRUE
+  )
+  # CLOSE MYSQL CONNECTION AFTER CLOSE FUNC
+  on.exit( {
+    tryCatch({
+      dbDisconnect(database_connect)
+    }, error = function(e) {
+      print(paste("Error when DB closing:", e$message))
+    })
+  })
+  
+  #WRITE TO MYSQL
+  if(is.null(key)) {
+    print("key is null")
+    showNotification(paste0("Failed to delete ",key,", ",keyname," is empty."), type = "error")
+  } else {
+    sql <- paste0("DELETE FROM `",db_name,"` WHERE `",keyname,"` = ?key")
+    query <- sqlInterpolate(database_connect, sql, key=key)
+    
+    tryCatch({
+      dbExecute(database_connect, query)
+      save_audit_log(database_connect, db_name, "DELETED ROW", paste("Deleted ", keyname, key), "app")
+      showNotification("Row has been deleted.", type = "error")
+    }, error = function(e) {
+      showNotification(paste("Error_DB:", e$message), type = "error")
+      print(paste("Error_DB:", e$message))
+    })
+  }
+  
+}
+
+
+
 read_users_from_DB <- function(){
   # MAKE MYSQL CONNECTION
   database_connect <- RMariaDB::dbConnect(

@@ -1,9 +1,10 @@
 
 main_scripts_dir <- "445_SHINY_REPOS/DM_Reports/"
 
-STUDY <- "445_SHINY_REPOS/DM_Reports/Templates/"
+STUDY <- "445_SHINY_REPOS/DM_Reports/"
 
 # Define Paths for Templates and Chapters
+STUDY_TEMPLATES <-" 445_SHINY_REPOS/DM_Reports/Templates/"
 STUDY_DA_PATH <- "445_SHINY_REPOS/DM_Reports/DataAging_Templates/"
 STUDY_DA_CHAPTERS_PATH <- "445_SHINY_REPOS/DM_Reports/DataAging_Chapters/"
 
@@ -15,6 +16,7 @@ APP_VERSION <- "TEST"
 USER_DB_NAME <- "PASSWORD-DB" #Stop admins in one app modifying users in a different app
 AUDIT_DB_NAME <- "AUDIT-DB"
 ROLES_DB_NAME <- "ROLES-DB"
+STUDIES_DB_NAME <- "STUDIES-DB"
 
 APP_TIMEZONE <- "Europe/Warsaw"
 AUDIT_LOG_DOWNLOAD_FILENAME <- "RM_Reporting_AuditLog"

@@ -11,7 +11,7 @@ DMReportUI <- function(id) {
                        width = 4, height = "200px",
                        solidHeader = TRUE, status = "primary",
                        title = "Select the study name",
-                       selectInput(ns("study_name_dm"), label = "Select or enter a study name:", choices = c("DEBRISOFT"), selected = "DEBRISOFT")
+                       selectInput(ns("study_name_dm"), label = "Select or enter a study name:", choices = c())
                      ),
                      box(
                        width = 4, height = "200px",
@@ -27,7 +27,8 @@ DMReportUI <- function(id) {
                          title = "Report Download",
                          p(strong("Click the button below to download the report.")),
                          downloadButton(ns("downloadWord_dm"), label = "Download")
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    ),
                    fluidRow(
@@ -38,7 +39,8 @@ DMReportUI <- function(id) {
                          solidHeader = TRUE,
                          title = "Data Preview",
                          dataTableOutput(ns("read_data_dm"))
-                       )
+                       ),
+                       ns=NS(id)
                      )
                    )
           ),
@@ -91,13 +93,8 @@ DMReportServer <- function(id) {
       
       variables <<- NULL
       all_data <<- NULL
-      
-      write_sharepoint_file <- function(data, file_name) {
-        temp_file <- tempfile(fileext = ".xlsx")
-        write_xlsx(data, temp_file)
-        drv$upload_file(temp_file, paste0(STUDY, file_name))
-      }
-      
+      # Reactive value for studies list
+      studies_list_dm <- reactiveVal(NULL)
       
       
       output$fileUploaded_dm <- reactive({
@@ -117,19 +114,21 @@ DMReportServer <- function(id) {
       # Define UI logic for download button and data preview
       outputOptions(output, "fileUploaded_dm", suspendWhenHidden = FALSE)
       
-      # Reactive value for studies list
-      studies_list_dm <<- reactiveVal()
-      
       # Load studies list from CSV file and update choices
       observe({
-        studies <- read.csv("studies_dm.csv", header = TRUE, stringsAsFactors = FALSE)
-        studies_list_dm(studies)
-        study_choices <- c(unique(studies_list_dm()$Study_Name))
-        updateSelectInput(session, "study_name_dm", choices = study_choices, selected = study_choices[1])
+        #studies <- read.csv("studies_dm.csv", header = TRUE, stringsAsFactors = FALSE)
+        if (is.null(studies_list_dm())) {
+          studies <- load_studies_list("DM")
+          studies_list_dm(studies)
+        }
+        
+        # study_choices <- c(unique(studies_list_dm()$Study_Name))
+        updateSelectInput(session, "study_name_dm", choices = studies_list_dm()$Study_Name, selected = studies_list_dm()[1,c("Study_Name")])
       })
       
       # Render studies table
       output$studies_table_dm <- renderDT({
+        req(studies_list_dm())
         datatable(
           studies_list_dm(), rownames = FALSE, selection = 'multiple', escape = FALSE,
           options = list(
@@ -152,23 +151,24 @@ DMReportServer <- function(id) {
       observeEvent(input$remove_study_dm, {
         req(input$studies_table_dm_rows_selected)
         studies <- studies_list_dm()
+        delete_from_database(STUDIES_DB_NAME, "Study", studies[input$studies_table_dm_rows_selected, c("Study_Name")])
         studies <- studies[-input$studies_table_dm_rows_selected, , drop = FALSE]
-        write.csv(studies, "studies_dm.csv", row.names = FALSE)
         studies_list_dm(studies)
       })
       
       # Add study button action
       observeEvent(input$add_study_dm, {
-        new_study_name_dm <<- input$new_study_dm
+        new_study_name_dm <- input$new_study_dm
         if (nchar(new_study_name_dm) > 0) {
-          new_study_dm <- data.frame(Study_Name = new_study_name_dm, stringsAsFactors = FALSE)
-          studies <- rbind(studies_list_dm(), new_study_dm)
-          write.csv(studies, "studies_dm.csv", row.names = FALSE)
-          studies_list_dm(studies)
+          new_study <- data.frame(
+            Study = as.character(new_study_name_dm),
+            DM = 1
+          )
+          studies <- add_db_data_return(STUDIES_DB_NAME, new_study)
+          studies_list_dm(studies$Studies)
+          updateTextInput(session, "new_study_dm", value = "")
         }
       })
-      
-      
       
       
       #### ad new study template
@@ -184,9 +184,8 @@ DMReportServer <- function(id) {
       })
       
       observeEvent(input$save, {
-        req(input$variables_template)
-        req(input$variables_name_new)
-        
+        req(input$variables_template, input$variables_name_new)
+
         # Write the file
         tryCatch({
           write_sharepoint_file(uploaded_data(), input$variables_name_new)
@@ -202,34 +201,10 @@ DMReportServer <- function(id) {
         study_name_dm <<- input$study_name_dm
       })
       
-      
-      read_sharepoint_file <- function(variables_data_name) {
-        temp_file <- tempfile(fileext = ".xlsx")
-        drv$download_file(paste0(STUDY, variables_data_name), dest = temp_file)
-        # return(readxl::read_xlsx(temp_file))
-        report_description <- read_excel(temp_file, sheet = "RaportDescription")
-        # print(report_description)
-        sheets <- as.character(report_description$items_names)
-        # sheets <- c("Recruitment" ,"Eligibility", "EOS"     ,    "AE"     ,     "SAE"  , "Descriptions")
-        #print(sheets)
-        variables_list <- lapply(sheets, function(sheet) {
-          read_excel(temp_file, sheet = sheet)
-          # filter(!is.na(ExportTag))  # Filter out rows with missing ExportTag
-        })
-        
-        #print(variables_list)
-        # Name the elements of the list based on sheet names
-        names(variables_list) <- sheets
-        #print(variables_list)
-        return(variables_list)
-      }
-      
-      
-      
       observeEvent(input$study_name_dm, {
         req(input$study_name_dm)
         template_name <- paste0(input$study_name_dm, ".xlsx")
-        variables <<- read_sharepoint_file(template_name)
+        variables <<- read_sharepoint_file("Templates",template_name)
       })
       
       

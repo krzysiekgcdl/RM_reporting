@@ -152,21 +152,27 @@ DMReportServer <- function(id) {
         req(input$studies_table_dm_rows_selected)
         studies <- studies_list_dm()
         delete_from_database(STUDIES_DB_NAME, "Study", studies[input$studies_table_dm_rows_selected, c("Study_Name")])
-        studies <- studies[-input$studies_table_dm_rows_selected, , drop = FALSE]
-        studies_list_dm(studies)
+        studies_list_dm(load_studies_list("DM", TRUE))
       })
       
       # Add study button action
       observeEvent(input$add_study_dm, {
         new_study_name_dm <- input$new_study_dm
-        if (nchar(new_study_name_dm) > 0) {
+        if (nchar(new_study_name_dm) > 0 && !(new_study_name_dm %in% STUDIES_LIST$Study)) {
           new_study <- data.frame(
             Study = as.character(new_study_name_dm),
             DM = 1
           )
+          write_audit_log(username = session$userData$USERNAME,
+                          action = "add_study",
+                          details = paste0("Added ", new_study_name_dm, " to list of DM studies.")
+                          )
           studies <- add_db_data_return(STUDIES_DB_NAME, new_study)
-          studies_list_dm(studies$Studies)
+          studies_list_dm(load_studies_list("DM", TRUE))
           updateTextInput(session, "new_study_dm", value = "")
+          showNotification(paste("Added new study:", new_study_name_dm), type = "message")
+        } else {
+          showNotification("Could not add study. Name must be unique and at least one character long.", type = "error")
         }
       })
       

@@ -140,9 +140,8 @@ queriesReportServer <- function(id) {
         req(input$studies_table_rows_selected)
         studies <- studies_list()
         delete_from_database(STUDIES_DB_NAME, "Study", studies[input$studies_table_rows_selected, c("Study_Name")])
-        studies <- studies[-input$studies_table_rows_selected, , drop = FALSE]
-        #write.csv(studies, "studies_queries.csv", row.names = FALSE)
-        studies_list(studies)
+        #studies <- studies[-input$studies_table_rows_selected, , drop = FALSE]
+        studies_list(load_studies_list("Queries", TRUE))
       })
       
       # Add study button action
@@ -153,9 +152,16 @@ queriesReportServer <- function(id) {
             Study = as.character(new_study_name),
             Queries = 1
           )
+          write_audit_log(username = session$userData$USERNAME,
+                          action = "add_study",
+                          details = paste0("Added ", new_study_name, " to list of queries studies.")
+          )
           studies <- add_db_data_return(STUDIES_DB_NAME, new_study)
-          studies_list(studies$Studies)
+          studies_list(load_studies_list("Queries", TRUE))
           updateTextInput(session, "new_study", value = "")
+          showNotification(paste("Added new study:", new_study_name), type = "message")
+        } else {
+          showNotification("Could not add study. Name must be unique and at least one character long.", type = "error")
         }
       })
       
